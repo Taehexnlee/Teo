@@ -19,7 +19,7 @@ using Serilog.Sinks.ApplicationInsights;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Serilog: 부트스트랩 로거(초기 예외도 캡처)
+// ── Serilog: 부트스트랩 로거
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .Enrich.FromLogContext()
@@ -34,7 +34,6 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
       .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName)
       .WriteTo.Console();
 
-    // App Insights 연결 문자열이 있으면 트레이스 전송
     var aiConn = ctx.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
     if (!string.IsNullOrWhiteSpace(aiConn))
     {
@@ -43,27 +42,32 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
     }
 });
 
-// (선택) App Insights SDK 활성화: 요청/종속성 자동 수집
+// (선택) App Insights SDK
 builder.Services.AddApplicationInsightsTelemetry();
 
-
-// === CORS (Vite & Dev/Prod 웹 허용) ===
-var allowed = new[]
+// === CORS (Vite & 정적 사이트 & Prod) ===
+// 우선순위: appsettings.json:Cors:AllowedOrigins > 기본값
+string[] defaultAllowed =
 {
     "http://localhost:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "https://teo-web-dev.azurewebsites.net",
-    "https://teowebdevstor001.z8.web.core.windows.net"   // ⬅️ 정적 웹 사이트 도메인 추가
-
+    // ✅ Azure Storage Static Website (현재 프런트 실제 도메인)
+    "https://teowebdevstor001.z8.web.core.windows.net"
 };
+var allowed = builder.Configuration
+    .GetSection("Cors:AllowedOrigins").Get<string[]>() ?? defaultAllowed;
+
 builder.Services.AddCors(opt =>
 {
     opt.AddPolicy("vite", p => p
         .WithOrigins(allowed)
         .AllowAnyHeader()
-        .AllowAnyMethod());
+        .AllowAnyMethod()
+        .AllowCredentials() // Bearer만 쓰면 필수는 아니지만 유연성을 위해 허용
+    );
 });
 
 builder.Services.AddControllers();
@@ -98,10 +102,8 @@ builder.Services
             NameClaimType  = "name",
             RoleClaimType  = "roles"
         };
-
-        // ✅ 들어온 클레임 키(sub/scp 등) 원문 보존
+        // 들어온 클레임 키(sub/scp 등) 원문 보존
         options.MapInboundClaims = false;
-
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     });
 
@@ -138,15 +140,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// 🔎 요청 로그 미들웨어(지연/상태코드 등)
-app.UseSerilogRequestLogging(opts =>
-{
-    // 느린 요청만 강조하고 싶다면:
-    // opts.GetLevel = (ctx, _, ex) =>
-    //     ex != null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error :
-    //     ctx.Response.StatusCode >= 400 ? LogEventLevel.Warning :
-    //     LogEventLevel.Information;
-});
+// 🔎 요청 로그
+app.UseSerilogRequestLogging();
 
 // === 미들웨어 순서 ===
 app.UseRouting();
@@ -167,12 +162,10 @@ using (var scope = app.Services.CreateScope())
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
     }
-
-    // ✅ 이제 EnsureCreated 대신 자동 마이그레이션
     await db.Database.MigrateAsync();
 
-    app.Logger.LogInformation("EnableDebugEndpoints={Enable} | SQLite CS={CS} | DS={DS} | Env={Env}",
-        enableDebug, effective, dataSource, app.Environment.EnvironmentName);
+    app.Logger.LogInformation("EnableDebugEndpoints={Enable} | SQLite CS={CS} | DS={DS} | Env={Env} | AllowedOrigins={Allowed}",
+        enableDebug, effective, dataSource, app.Environment.EnvironmentName, string.Join(",", allowed));
 }
 
 // === 헬스 ===
@@ -215,7 +208,6 @@ if (enableDebug)
 
     dbg.MapPost("/seed", async (AppDbContext db) =>
     {
-        // 개발 편의용: 로컬에서만 사용
         await db.Database.MigrateAsync();
         var ok = await db.Database.CanConnectAsync();
         return Results.Ok(new { migrated = true, canConnect = ok });
