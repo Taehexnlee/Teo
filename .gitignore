@@ -1,0 +1,11 @@
+.DS_Store
+
+# Node/Vite
+node_modules/
+src/Web/dist/
+*.log
+
+# .NET
+**/bin/
+**/obj/
+.vs/

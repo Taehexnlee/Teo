@@ -1,0 +1,46 @@
+name: Deploy Web to Azure Storage ($web, access key)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        working-directory: src/Web
+        run: npm ci
+
+      - name: Build
+        working-directory: src/Web
+        env:
+          VITE_API_BASE: https://teo-api-dev.azurewebsites.net/api
+          VITE_ADB2C_INSTANCE: https://teohospo.ciamlogin.com
+          VITE_ADB2C_TENANT_ID: 0a060e77-86d6-42b0-ba68-9c25728c3953
+          VITE_ADB2C_CLIENT_ID: 9cdaeb46-e724-4bdd-bc2b-f8c125a1186a
+          VITE_API_SCOPE: api://0c768de4-d708-4131-a971-f302f2dfd76f/access_as_user
+        run: npm run build
+
+      - name: Upload to $web (overwrite)
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az storage blob upload-batch \
+              --account-name "$AZURE_STORAGE_ACCOUNT" \
+              --account-key "${{ secrets.AZURE_STORAGE_KEY }}" \
+              -d '$web' \
+              -s src/Web/dist \
+              --overwrite
