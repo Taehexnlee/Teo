@@ -1,0 +1,45 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Api/Dockerfile
+    container_name: teo-api
+    environment:
+      # DB
+      - ConnectionStrings__Sqlite=Data Source=/data/teo.db
+
+      # ASP.NET
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+
+      # ✅ CIAM(테넌트ID 기반)
+      - AzureAdB2C__Instance=https://teohospo.ciamlogin.com
+      - AzureAdB2C__TenantId=0a060e77-86d6-42b0-ba68-9c25728c3953
+      - AzureAdB2C__Audience=0c768de4-d708-4131-a971-f302f2dfd76f
+
+      # (선택: 사용 안 해도 무방)
+      - AzureAdB2C__Domain=teohospo.onmicrosoft.com
+      - AzureAdB2C__ClientId=0c768de4-d708-4131-a971-f302f2dfd76f
+
+    volumes:
+      - dbdata:/data
+    ports:
+      - "5256:8080"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: src/Web
+      dockerfile: Dockerfile
+      args:
+        # Nginx로 80에 뜨지만, 프런트가 백엔드를 부를 때는 로컬호스트 5256으로
+        VITE_API_BASE: "http://localhost:5256"
+    container_name: teo-web
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  dbdata:
