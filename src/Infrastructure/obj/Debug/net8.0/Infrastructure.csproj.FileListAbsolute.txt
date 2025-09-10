@@ -17,3 +17,4 @@
 /Users/leeteaheon/teo/src/Infrastructure/obj/Debug/net8.0/ref/Infrastructure.dll
 /Users/leeteaheon/teo/src/Infrastructure/bin/Debug/net8.0/Infrastructure.runtimeconfig.json
 /Users/leeteaheon/teo/src/Infrastructure/obj/Debug/net8.0/Infrastructure.genruntimeconfig.cache
+/Users/leeteaheon/teo/src/Infrastructure/obj/Debug/net8.0/Infrastructure.sourcelink.json

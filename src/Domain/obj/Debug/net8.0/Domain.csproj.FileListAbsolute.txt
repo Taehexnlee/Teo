@@ -9,3 +9,4 @@
 /Users/leeteaheon/teo/src/Domain/obj/Debug/net8.0/refint/Domain.dll
 /Users/leeteaheon/teo/src/Domain/obj/Debug/net8.0/Domain.pdb
 /Users/leeteaheon/teo/src/Domain/obj/Debug/net8.0/ref/Domain.dll
+/Users/leeteaheon/teo/src/Domain/obj/Debug/net8.0/Domain.sourcelink.json
